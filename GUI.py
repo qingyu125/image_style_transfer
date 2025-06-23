@@ -80,9 +80,18 @@ class StyleTransferApp(QMainWindow):
         # 加载预训练模型
         self.statusBar().showMessage("正在加载模型...")
         self.model = None  # 初始化模型为None
+        
+        # 尝试从打包后的路径加载模型
+        if hasattr(sys, '_MEIPASS'):
+            # 打包后的路径
+            model_path = os.path.join(sys._MEIPASS, 'arbitrary-image-stylization-v1-tensorflow1-256-v2')
+        else:
+            # 开发环境路径
+            model_path = './arbitrary-image-stylization-v1-tensorflow1-256-v2'
+            
         try:
             # 尝试从本地加载模型
-            self.model = hub.load('./arbitrary-image-stylization-v1-tensorflow1-256-v2/')
+            self.model = hub.load(model_path)
             self.statusBar().showMessage("模型加载成功")
         except Exception as e:
             # 如果本地加载失败，尝试从网络加载
@@ -102,7 +111,7 @@ class StyleTransferApp(QMainWindow):
         # 按钮
         self.content_btn = QPushButton("选择内容图像")
         self.style_btn = QPushButton("选择风格图像")
-        self.transfer_btn = QPushButton("开始转换")
+        self.transfer_btn = QPushButton("开始迁移")
         self.transfer_btn.setEnabled(False)  # 初始禁用，直到选择了图像
         self.save_btn = QPushButton("保存结果")
         self.save_btn.setEnabled(False)  # 初始禁用，直到生成了结果
@@ -128,7 +137,7 @@ class StyleTransferApp(QMainWindow):
             padding: 5px;
         """)
         
-        self.result_label = QLabel("转换结果")
+        self.result_label = QLabel("迁移结果")
         self.result_label.setAlignment(Qt.AlignCenter)
         self.result_label.setMinimumSize(300, 300)
         self.result_label.setStyleSheet("""
@@ -209,7 +218,7 @@ class StyleTransferApp(QMainWindow):
             self.update_transfer_button_state()
     
     def update_transfer_button_state(self):
-        """更新转换按钮状态"""
+        """更新迁移按钮状态"""
         # 检查模型是否为有效对象（非 None 且可调用）
         model_valid = self.model is not None and callable(self.model)
         content_valid = isinstance(self.content_path, str) and len(self.content_path) > 0
@@ -235,7 +244,7 @@ class StyleTransferApp(QMainWindow):
         self.transfer_btn.setEnabled(False)
         self.statusBar().showMessage("正在进行风格迁移...")
         
-        # 创建并启动转换线程
+        # 创建并启动迁移线程
         self.transfer_thread = StyleTransferThread(
             self.model, self.content_path, self.style_path
         )
@@ -249,7 +258,7 @@ class StyleTransferApp(QMainWindow):
         self.progress_bar.setValue(value)
     
     def on_transfer_completed(self, result_image):
-        """转换完成回调"""
+        """迁移完成回调"""
         self.result_image = result_image
         self.display_numpy_image(self.result_label, result_image)
         self.transfer_btn.setEnabled(True)
@@ -257,7 +266,7 @@ class StyleTransferApp(QMainWindow):
         self.statusBar().showMessage("风格迁移完成")
     
     def on_transfer_error(self, error_msg):
-        """转换错误回调"""
+        """迁移错误回调"""
         self.transfer_btn.setEnabled(True)
         self.statusBar().showMessage("风格迁移失败")
         QMessageBox.critical(self, "错误", f"风格迁移失败: {error_msg}")
