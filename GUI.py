@@ -1,11 +1,15 @@
 import sys
 import os
+
+# 优化设置：关闭警告和日志
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'  # 关闭oneDNN提示
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'   # 减少TensorFlow日志
 import tensorflow as tf
 import tensorflow_hub as hub
 from qtpy.QtWidgets import (QApplication, QMainWindow, QPushButton, QVBoxLayout, 
                             QHBoxLayout, QLabel, QFileDialog, QWidget, QProgressBar, 
                             QMessageBox, QFrame)
-from qtpy.QtGui import QPixmap, QImage
+from qtpy.QtGui import QPixmap, QImage, QColor, QPen, QBrush
 from qtpy.QtCore import Qt, QThread, Signal
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
@@ -15,7 +19,7 @@ import numpy as np
 plt.rcParams["font.family"] = ["SimHei"]
 
 class StyleTransferThread(QThread):
-    """风格转换线程，避免UI卡顿"""
+    """风格迁移线程，避免UI卡顿"""
     progress_updated = Signal(int)
     transfer_completed = Signal(object)
     error_occurred = Signal(str)
@@ -36,7 +40,7 @@ class StyleTransferThread(QThread):
             self.progress_updated.emit(30)
             style_image = self.load_image(self.style_path)
             
-            # 执行风格转换
+            # 执行风格迁移
             self.progress_updated.emit(50)
             stylized_image = self.model(tf.constant(content_image), tf.constant(style_image))[0]
             
@@ -65,16 +69,17 @@ class StyleTransferThread(QThread):
         return img[tf.newaxis, :]
 
 class StyleTransferApp(QMainWindow):
-    """风格转换主应用窗口"""
+    """风格迁移主应用窗口"""
     def __init__(self):
         super().__init__()
         
         # 设置窗口标题和大小
-        self.setWindowTitle("图像风格转换应用")
+        self.setWindowTitle("图像风格迁移系统")
         self.setMinimumSize(1000, 600)
         
         # 加载预训练模型
         self.statusBar().showMessage("正在加载模型...")
+        self.model = None  # 初始化模型为None
         try:
             # 尝试从本地加载模型
             self.model = hub.load('./arbitrary-image-stylization-v1-tensorflow1-256-v2/')
@@ -82,13 +87,10 @@ class StyleTransferApp(QMainWindow):
         except Exception as e:
             # 如果本地加载失败，尝试从网络加载
             try:
-                self.statusBar().showMessage("本地模型加载失败，正在从网络加载...")
                 self.model = hub.load('https://tfhub.dev/google/magenta/arbitrary-image-stylization-v1-256/2')
-                self.statusBar().showMessage("模型从网络加载成功")
             except Exception as e:
                 self.statusBar().showMessage(f"模型加载失败: {str(e)}")
                 QMessageBox.critical(self, "错误", f"无法加载模型: {str(e)}")
-                self.model = None
         
         # 创建UI组件
         self.create_widgets()
@@ -105,21 +107,36 @@ class StyleTransferApp(QMainWindow):
         self.save_btn = QPushButton("保存结果")
         self.save_btn.setEnabled(False)  # 初始禁用，直到生成了结果
         
-        # 图像显示区域
+        # 图像显示区域 - 设置黑色边框
         self.content_label = QLabel("内容图像")
         self.content_label.setAlignment(Qt.AlignCenter)
-        self.content_label.setFrameShape(QFrame.StyledPanel)
         self.content_label.setMinimumSize(300, 300)
+        self.content_label.setStyleSheet("""
+            border: 2px solid black;
+            border-radius: 0px;
+            background-color: white;
+            padding: 5px;
+        """)
         
         self.style_label = QLabel("风格图像")
         self.style_label.setAlignment(Qt.AlignCenter)
-        self.style_label.setFrameShape(QFrame.StyledPanel)
         self.style_label.setMinimumSize(300, 300)
+        self.style_label.setStyleSheet("""
+            border: 2px solid black;
+            border-radius: 0px;
+            background-color: white;
+            padding: 5px;
+        """)
         
         self.result_label = QLabel("转换结果")
         self.result_label.setAlignment(Qt.AlignCenter)
-        self.result_label.setFrameShape(QFrame.StyledPanel)
         self.result_label.setMinimumSize(300, 300)
+        self.result_label.setStyleSheet("""
+            border: 2px solid black;
+            border-radius: 0px;
+            background-color: white;
+            padding: 5px;
+        """)
         
         # 进度条
         self.progress_bar = QProgressBar()
@@ -209,14 +226,14 @@ class StyleTransferApp(QMainWindow):
         label.setPixmap(scaled_pixmap)
     
     def start_transfer(self):
-        """开始风格转换"""
+        """开始风格迁移"""
         if not self.model:
             QMessageBox.critical(self, "错误", "模型未加载，请检查网络连接或本地模型路径")
             return
         
         self.progress_bar.setValue(0)
         self.transfer_btn.setEnabled(False)
-        self.statusBar().showMessage("正在进行风格转换...")
+        self.statusBar().showMessage("正在进行风格迁移...")
         
         # 创建并启动转换线程
         self.transfer_thread = StyleTransferThread(
@@ -237,13 +254,13 @@ class StyleTransferApp(QMainWindow):
         self.display_numpy_image(self.result_label, result_image)
         self.transfer_btn.setEnabled(True)
         self.save_btn.setEnabled(True)
-        self.statusBar().showMessage("风格转换完成")
+        self.statusBar().showMessage("风格迁移完成")
     
     def on_transfer_error(self, error_msg):
         """转换错误回调"""
         self.transfer_btn.setEnabled(True)
-        self.statusBar().showMessage("风格转换失败")
-        QMessageBox.critical(self, "错误", f"风格转换失败: {error_msg}")
+        self.statusBar().showMessage("风格迁移失败")
+        QMessageBox.critical(self, "错误", f"风格迁移失败: {error_msg}")
     
     def display_numpy_image(self, label, image):
         """显示NumPy数组格式的图像"""
@@ -287,4 +304,4 @@ def main():
     sys.exit(app.exec_())
 
 if __name__ == "__main__":
-    main()    
+    main()
